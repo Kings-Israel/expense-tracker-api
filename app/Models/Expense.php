@@ -14,6 +14,7 @@ class Expense extends Model
         'converted_currency',
         'conversion_rate',
         'message',
+        'entry_type',
         'source',
         'reference',
         'transaction_date',

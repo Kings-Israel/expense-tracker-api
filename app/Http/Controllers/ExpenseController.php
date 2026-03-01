@@ -66,6 +66,7 @@ class ExpenseController extends Controller
             'converted_currency' => $user->default_currency,
             'conversion_rate' => $conversionRate,
             'message' => $message,
+            'entry_type' => 'sms',
             'source' => $parsedData['source'],
             'reference' => $parsedData['reference'],
             'transaction_date' => $parsedData['transaction_date'] ?? now(),
@@ -75,6 +76,110 @@ class ExpenseController extends Controller
             'message' => 'Expense recorded successfully',
             'expense' => $expense,
         ], 201);
+    }
+
+    /**
+     * Manually add an expense not captured by the SMS service
+     */
+    public function store(Request $request)
+    {
+        $request->validate([
+            'amount' => 'required|numeric|min:0.01',
+            'currency' => 'required|string|size:3',
+            'description' => 'nullable|string|max:500',
+            'source' => 'nullable|string|in:bank,mobile_money,cash,other',
+            'reference' => 'nullable|string|max:100',
+            'transaction_date' => 'nullable|date',
+        ]);
+
+        $user = $request->user();
+        $currency = strtoupper($request->currency);
+
+        $conversionRate = $this->currencyService->getConversionRate(
+            $currency,
+            $user->default_currency
+        );
+
+        $expense = Expense::create([
+            'user_id' => $user->id,
+            'original_amount' => $request->amount,
+            'original_currency' => $currency,
+            'converted_amount' => $request->amount * $conversionRate,
+            'converted_currency' => $user->default_currency,
+            'conversion_rate' => $conversionRate,
+            'message' => $request->description,
+            'entry_type' => 'manual',
+            'source' => $request->source ?? 'other',
+            'reference' => $request->reference,
+            'transaction_date' => $request->transaction_date ?? now(),
+        ]);
+
+        return response()->json([
+            'message' => 'Expense added successfully',
+            'expense' => $expense,
+        ], 201);
+    }
+
+    /**
+     * Update an existing expense
+     */
+    public function update(Request $request, $id)
+    {
+        $expense = Expense::where('user_id', $request->user()->id)
+            ->findOrFail($id);
+
+        $request->validate([
+            'amount' => 'sometimes|numeric|min:0.01',
+            'currency' => 'sometimes|string|size:3',
+            'description' => 'nullable|string|max:500',
+            'source' => 'nullable|string|in:bank,mobile_money,cash,other',
+            'reference' => 'nullable|string|max:100',
+            'transaction_date' => 'nullable|date',
+        ]);
+
+        $updateData = [];
+
+        if ($request->hasAny(['amount', 'currency'])) {
+            $newAmount = $request->amount ?? $expense->original_amount;
+            $newCurrency = strtoupper($request->currency ?? $expense->original_currency);
+
+            if ($newCurrency !== $expense->original_currency) {
+                $conversionRate = $this->currencyService->getConversionRate(
+                    $newCurrency,
+                    $expense->converted_currency
+                );
+                $updateData['conversion_rate'] = $conversionRate;
+            } else {
+                $conversionRate = $expense->conversion_rate;
+            }
+
+            $updateData['original_amount'] = $newAmount;
+            $updateData['original_currency'] = $newCurrency;
+            $updateData['converted_amount'] = $newAmount * $conversionRate;
+        }
+
+        if ($request->has('description')) {
+            $updateData['message'] = $request->description;
+        }
+
+        if ($request->has('source')) {
+            $updateData['source'] = $request->source;
+        }
+
+        if ($request->has('reference')) {
+            $updateData['reference'] = $request->reference;
+        }
+
+        if ($request->has('transaction_date')) {
+            $updateData['transaction_date'] = $request->transaction_date;
+        }
+
+        $expense->update($updateData);
+
+        return response()->json([
+            'message' => 'Expense updated successfully',
+            'expense' => $expense->fresh(),
+        ]);
     }
 
     /**

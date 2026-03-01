@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CurrencyController;
+use App\Http\Controllers\Api\ExpenseController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 

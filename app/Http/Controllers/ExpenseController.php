@@ -192,6 +192,7 @@ class ExpenseController extends Controller
         ]);
 
         $user = $request->user();
+        info($user);
         $period = $request->period;
 
         // Calculate date range based on period

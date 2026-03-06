@@ -197,7 +197,7 @@ class ExpenseController extends Controller
 
         // Calculate date range based on period
         $dateRange = $this->getDateRangeForPeriod($period);
-        info($dateRange);
+
         // Get expenses for the period
         $expenses = Expense::where('user_id', $user->id)
             ->whereBetween('transaction_date', [$dateRange['start'], $dateRange['end']])
